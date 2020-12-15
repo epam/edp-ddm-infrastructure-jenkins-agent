@@ -1,0 +1,11 @@
+apiVersion: authorization.openshift.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gitops-admin-{{ .Values.global.edpName }}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: "gitops-admin"
+    namespace: {{ .Values.global.edpName }}
