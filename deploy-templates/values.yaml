@@ -1,0 +1,6 @@
+agentName: infrastructure-jenkins-agent
+
+global:
+  edpName: mdtu-ddm-edp-cicd-control-plane-dev
+  storageClass: ocs-storagecluster-ceph-rbd
+  platform: openshift
