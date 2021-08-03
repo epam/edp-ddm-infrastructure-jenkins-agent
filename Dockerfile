@@ -26,8 +26,12 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master
 RUN pip3 install -r /root/pip3_test_requirements.txt
 
 
-RUN curl https://rclone.org/install.sh | bash \
-    && wget https://github.com/vmware-tanzu/velero/releases/download/v${VELERO_VERSION}/velero-v${VELERO_VERSION}-linux-amd64.tar.gz
+RUN curl https://rclone.org/install.sh | bash
+RUN mkdir /home/jenkins/backup && mkdir /home/jenkins/restore
+COPY ./scripts/restore_rclone.sh /home/jenkins/restore
+COPY ./scripts/backup_rclone.sh /home/jenkins/backup
+RUN wget https://github.com/vmware-tanzu/velero/releases/download/v${VELERO_VERSION}/velero-v${VELERO_VERSION}-linux-amd64.tar.gz
 RUN tar -xvf velero-v${VELERO_VERSION}-linux-amd64.tar.gz \
     && rm velero-v${VELERO_VERSION}-linux-amd64.tar.gz \
     && mv velero-v${VELERO_VERSION}-linux-amd64/velero /usr/local/bin/
+
