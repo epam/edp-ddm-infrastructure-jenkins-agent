@@ -4,6 +4,7 @@ ENV PYTHONUNBUFFERED=1
 ENV VELERO_VERSION=1.6.0
 ENV OPENSHIFT_BUILD_NAME=edp-jenkins-maven-java11-agent-dockerfile-release-2-0-2 OPENSHIFT_BUILD_NAMESPACE=oc-green-edp-cicd
 USER root
+RUN mkdir /home/jenkins/backup && mkdir /home/jenkins/restore
 COPY ./scripts/restore_rclone.sh /home/jenkins/restore
 COPY ./scripts/backup_rclone.sh /home/jenkins/backup
 COPY pip3_test_requirements.txt /root/
@@ -25,9 +26,6 @@ RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master
 # required for tests, but need to check if it is really needed
 RUN pip3 install -r /root/pip3_test_requirements.txt
 
-RUN mkdir /home/jenkins/backup && mkdir /home/jenkins/restore
-COPY ./scripts/restore_rclone.sh /home/jenkins/restore
-COPY ./scripts/backup_rclone.sh /home/jenkins/backup
 RUN curl https://rclone.org/install.sh | bash
 RUN wget https://github.com/vmware-tanzu/velero/releases/download/v${VELERO_VERSION}/velero-v${VELERO_VERSION}-linux-amd64.tar.gz
 RUN tar -xvf velero-v${VELERO_VERSION}-linux-amd64.tar.gz \
