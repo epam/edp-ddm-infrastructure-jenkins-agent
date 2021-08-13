@@ -17,11 +17,11 @@ backup_date=$(date '+%Y-%m-%d-%H-%M-%S')
 
 
 echo "Getting AWS_KEY for secret"
-access_key_aws=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
+access_key_aws=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $1}')
 echo "Getting AWS_SECRET_KEY for secret"
-access_secret_key_aws=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
+access_secret_key_aws=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $2}')
 echo "Getting backupBucket for secret"
-destination_bucket=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.backupBucket}' | base64 -d)
+destination_bucket=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-location}' | base64 -d)
 
 for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} -o=NAME) ; do
 bucket=$(oc get "${bucket_claim}" -n "${registry_name}" -o=jsonpath="{.spec.bucketName}")
