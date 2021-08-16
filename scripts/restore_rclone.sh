@@ -8,9 +8,9 @@ noobaa_s3_host=$(oc get route/s3 -n openshift-storage -o jsonpath='{.spec.host}'
 noobaa_s3_endpoint="https://${noobaa_s3_host}"
 
 echo "Getting AWS_KEY for secret"
-access_key_aws=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $1}')
+access_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $1}')
 echo "Getting AWS_SECRET_KEY for secret"
-access_secret_key_aws=$(oc get secret/backup-credential -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $2}')
+access_secret_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $2}')
 echo "Start Velero section"
 
 
