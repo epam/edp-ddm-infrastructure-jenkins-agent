@@ -16,8 +16,8 @@ echo "Start Velero section"
 
 velero_backup=$(oc get regbackup/${backup_name}  -o jsonpath=\'{.spec.velero-backup-name}\'| cut -c2- |rev | cut -c2- | rev)
 echo ${velero_backup}
-time velero restore create --exclude-resources configmaps --from-backup ${velero_backup} --wait
-time velero restore create --exclude-resources secrets --from-backup ${velero_backup} --wait
+time velero restore create --include-resources configmaps --from-backup ${velero_backup} --wait
+time velero restore create --include-resources secrets --from-backup ${velero_backup} --wait
 
 time velero restore create --selector app=citus-master --from-backup ${velero_backup} --wait
 while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master' -o jsonpath={.items[*].status.containerStatuses[0].ready})" != "true" && $(curl citus-master.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 | grep "Empty reply from server") == '' ]]; do
