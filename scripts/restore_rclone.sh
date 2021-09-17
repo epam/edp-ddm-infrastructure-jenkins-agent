@@ -16,13 +16,28 @@ echo "Start Velero section"
 
 velero_backup=$(oc get regbackup/${backup_name}  -o jsonpath=\'{.spec.velero-backup-name}\'| cut -c2- |rev | cut -c2- | rev)
 echo ${velero_backup}
-time velero restore create --exclude-resources deploymentconfigs --from-backup ${velero_backup} --wait
-sleep 30
-time velero restore create --include-resources deploymentconfigs --from-backup ${velero_backup} --wait
+time velero restore create --exclude-resources configmaps --from-backup ${velero_backup} --wait
+time velero restore create --exclude-resources secrets --from-backup ${velero_backup} --wait
 
-oc get pod --selector=app=jenkins -n ${registry_name} -o=NAME | xargs -r oc delete -n ${registry_name}
-oc get pod --selector=app=nexus -n ${registry_name} -o=NAME | xargs -r oc delete -n ${registry_name}
-oc get pod --selector=app=gerrit -n ${registry_name} -o=NAME | xargs -r oc delete -n ${registry_name}
+time velero restore create --selector app=citus-master --from-backup ${velero_backup} --wait
+while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master' -o jsonpath={.items[*].status.containerStatuses[0].ready})" != "true" && $(curl citus-master.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 | grep "Empty reply from server") == '' ]]; do
+  pod_name=`oc get pod -l app=citus-master --no-headers -o NAME -n ${registry_name}`
+  oc delete $pod_name -n ${registry_name}
+    while [[ $(oc get pods -l app='citus-master' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+      echo "waiting for pod" && sleep 1;
+    done
+done
+
+time velero restore create --selector app=citus-master-rep --from-backup ${velero_backup} --wait
+while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master-rep' -o jsonpath={.items[*].status.containerStatuses[0].ready})" != "true" && $(curl citus-master-rep.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 |grep "Empty reply from server") == '' ]]; do
+  pod_name=`oc get pod -l app=citus-master-rep --no-headers -o NAME -n ${registry_name}`
+  oc delete $pod_name -n ${registry_name}
+    while [[ $(oc get pods -l app='citus-master-rep' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+      echo "waiting for pod" && sleep 1;
+     done
+done
+
+time velero restore create --from-backup ${velero_backup} --wait
 
 echo "End Velero section"
 for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} -o=NAME) ; do
