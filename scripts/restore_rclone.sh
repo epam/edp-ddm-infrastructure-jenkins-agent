@@ -13,14 +13,13 @@ echo "Getting AWS_SECRET_KEY for secret"
 access_secret_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-credentials}' | base64 -d | awk -F : '{print $2}')
 echo "Start Velero section"
 
-
 velero_backup=$(oc get regbackup/${backup_name}  -o jsonpath=\'{.spec.velero-backup-name}\'| cut -c2- |rev | cut -c2- | rev)
 echo ${velero_backup}
 time velero restore create --include-resources configmaps --from-backup ${velero_backup} --wait
 time velero restore create --include-resources secrets --from-backup ${velero_backup} --wait
 
 time velero restore create --selector app=citus-master --from-backup ${velero_backup} --wait
-while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master' -o jsonpath={.items[*].status.containerStatuses[0].ready})" != "true" && $(curl citus-master.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 | grep "Empty reply from server") == '' ]]; do
+while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master' -o 'jsonpath={.items[*].status.containerStatuses[0].ready}')" != "true" && $(curl citus-master.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 | grep "Empty reply from server") == '' ]]; do
   pod_name=`oc get pod -l app=citus-master --no-headers -o NAME -n ${registry_name}`
   oc delete $pod_name -n ${registry_name}
     while [[ $(oc get pods -l app='citus-master' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
@@ -29,18 +28,41 @@ while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master' -o jsonpath={.
 done
 
 time velero restore create --selector app=citus-master-rep --from-backup ${velero_backup} --wait
-while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master-rep' -o jsonpath={.items[*].status.containerStatuses[0].ready})" != "true" && $(curl citus-master-rep.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 |grep "Empty reply from server") == '' ]]; do
+while [[ "$(oc get pods -n ${registry_name} -l=app='citus-master-rep' -o 'jsonpath={.items[*].status.containerStatuses[0].ready}')" != "true" && $(curl citus-master-rep.${registry_name}.svc.cluster.local:5432 --connect-timeout 5 |grep "Empty reply from server") == '' ]]; do
   pod_name=`oc get pod -l app=citus-master-rep --no-headers -o NAME -n ${registry_name}`
   oc delete $pod_name -n ${registry_name}
-    while [[ $(oc get pods -l app='citus-master-rep' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+    while [[ $(oc get pods -l app='citus-master-rep' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n "${registry_name}") != "True" ]]; do
       echo "waiting for pod" && sleep 1;
      done
 done
 
-time velero restore create --from-backup ${velero_backup} --wait
+time velero restore create --selector app=citus-workers --from-backup "${velero_backup}" --wait
+sleep 10
+  pod_name=$(oc get pod -l app=citus-workers --no-headers -o NAME -n "${registry_name}")
+
+for i in ${pod_name} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting citus-worker pod"
+    sleep 20
+  done
+done
+
+time velero restore create --selector app=citus-workers-rep --from-backup "${velero_backup}" --wait
+sleep 10
+pod_name=$(oc get pod -l app=citus-workers-rep --no-headers -o NAME -n "${registry_name}")
+for i in ${pod_name} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting citus-worker-rep pod"
+    sleep 20
+  done
+done
+
+time velero restore create --from-backup "${velero_backup}" --wait
 
 echo "End Velero section"
-for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} -o=NAME) ; do
+for bucket_claim in $(oc get objectbucketclaim -n "${registry_name}" -o=NAME) ; do
   echo $bucket_claim
 
 obc_name=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "$bucket_claim")
@@ -117,4 +139,3 @@ route_count=$(oc get routes -n ${registry_name} --field-selector=spec.to.name=$i
     if [[ "${route_count}" -ge "2" ]]; then
 oc get routes -n ${registry_name} --field-selector=spec.to.name=$i,spec.path!='' --no-headers |grep -v HostAlreadyClaimed | awk {'print $1'}| xargs -r oc delete route -n ${registry_name};
     fi ; done
-
