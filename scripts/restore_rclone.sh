@@ -48,6 +48,7 @@ while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(
   done
 done
 
+
 time velero restore create --selector app=citus-workers-rep --from-backup "${velero_backup}" --wait
 sleep 10
 pod_name=$(oc get pod -l app=citus-workers-rep --no-headers -o NAME -n "${registry_name}")
@@ -55,6 +56,28 @@ for i in ${pod_name} ;do
 while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
     oc delete "$i" -n "${registry_name}" ;
     echo "Waiting citus-worker-rep pod"
+    sleep 20
+  done
+done
+
+time velero restore create --selector app=form-management-modeler --from-backup "${velero_backup}" --wait
+sleep 10
+pod_name=$(oc get pod -l app=app=form-management-modeler-db --no-headers -o NAME -n "${registry_name}")
+for i in ${pod_name} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting app=form-management-modeler-db pod"
+    sleep 20
+  done
+done
+
+time velero restore create --selector app=form-management-provider --from-backup "${velero_backup}" --wait
+sleep 10
+pod_name=$(oc get pod -l app=app=form-management-provider-db --no-headers -o NAME -n "${registry_name}")
+for i in ${pod_name} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting app=form-management-provider-db pod"
     sleep 20
   done
 done
