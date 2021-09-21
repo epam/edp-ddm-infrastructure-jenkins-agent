@@ -48,6 +48,16 @@ while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(
   done
 done
 
+time velero restore create --selector app=citus-workers-rep --from-backup "${velero_backup}" --wait
+sleep 10
+pod_name=$(oc get pod -l app=citus-workers-rep --no-headers -o NAME -n "${registry_name}")
+for i in ${pod_name} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting citus-worker-rep pod"
+    sleep 20
+  done
+done
 
 time velero restore create --selector app=citus-workers-rep --from-backup "${velero_backup}" --wait
 sleep 10
@@ -70,6 +80,14 @@ while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(
     sleep 20
   done
 done
+pod_name_app=$(oc get pod -l app=form-management-modeler --no-headers -o NAME -n "${registry_name}")
+for i in ${pod_name_app} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting app=form-management-modeler pod"
+    sleep 20
+  done
+done
 
 time velero restore create --selector app=form-management-provider --from-backup "${velero_backup}" --wait
 sleep 10
@@ -81,8 +99,16 @@ while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(
     sleep 20
   done
 done
+pod_name_app=$(oc get pod -l app=form-management-provider-db --no-headers -o NAME -n "${registry_name}")
+for i in ${pod_name_app} ;do
+while [[ "$(oc get $i -n "${registry_name}" -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}')" != "True" ]]; do
+    oc delete "$i" -n "${registry_name}" ;
+    echo "Waiting app=form-management-provider pod"
+    sleep 20
+  done
+done
 
-time velero restore create --from-backup "${velero_backup}" --wait
+time velero restore create --from-backup "${velero_backup}" --exclude-resources pods --wait
 
 echo "End Velero section"
 for bucket_claim in $(oc get objectbucketclaim -n "${registry_name}" -o=NAME) ; do
