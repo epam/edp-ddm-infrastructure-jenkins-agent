@@ -11,6 +11,8 @@ echo "Getting AWS_KEY for secret"
 access_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-access-key-id}' | base64 -d )
 echo "Getting AWS_SECRET_KEY for secret"
 access_secret_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-secret-access-key}' | base64 -d )
+echo "Getting Rook endpoint"
+rook_s3_endpoint=$(oc get cephobjectstore/mdtuddm -n openshift-storage -o=jsonpath='{.status.info.endpoint}')
 echo "Start Velero section"
 
 velero_backup=$(oc get regbackup/${backup_name}  -o jsonpath=\'{.spec.velero-backup-name}\'| cut -c2- |rev | cut -c2- | rev)
@@ -146,8 +148,6 @@ EOF
   echo sleep 10
   acess_key_rook=$(oc get secret/"${obc_name}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
   access_secret_key_rook=$(oc get secret/${obc_name} -n "${registry_name}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
-  rook_s3_endpoint=$(oc get objectbucketclaim/"${obc_name}" -n "${registry_name}" -o=jsonpath='{.spec.objectBucketName}' | xargs oc get objectbucket -n "${registry_name}" -o=jsonpath='{.spec.endpoint.bucketHost}')
-
   mkdir -p ~/.config/rclone
   get_registry_backup_name=$(oc get regbackup -o=NAME | grep ${backup_name})
   registry_backup_name=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "${get_registry_backup_name}")

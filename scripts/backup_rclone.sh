@@ -20,8 +20,10 @@ echo "Getting AWS_KEY for secret"
 access_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-access-key-id}' | base64 -d )
 echo "Getting AWS_SECRET_KEY for secret"
 access_secret_key_aws=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-secret-access-key}' | base64 -d )
-echp "Getting Minio Url from secret"
+echo "Getting Minio Url from secret"
 minio_endpoint=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-url}' | base64 -d)
+echo "Getting Rook endpoint"
+rook_s3_endpoint=$(oc get cephobjectstore/mdtuddm -n openshift-storage -o=jsonpath='{.status.info.endpoint}')
 echo "Getting backupBucket for secret"
 destination_bucket=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-location}' | base64 -d)
 
@@ -31,7 +33,6 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers 
 
   access_key_rook=$(oc get secret/"${bucket_claim}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
   access_secret_key_rook=$(oc get secret/"${bucket_claim}" -n "${registry_name}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
-  rook_s3_endpoint=$(oc get objectbucketclaim/"${bucket_claim}" -n "${registry_name}" -o=jsonpath='{.spec.objectBucketName}' | xargs oc get objectbucket -n "${registry_name}" -o=jsonpath='{.spec.endpoint.bucketHost}')
   mkdir -p ~/.config/rclone
 
   echo "
