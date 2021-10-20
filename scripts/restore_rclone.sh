@@ -117,83 +117,82 @@ time velero create restore --include-resources keycloakauthflows --from-backup "
 echo "End restore KeycloakAuthFlow"
 
 echo "End Velero section"
-for bucket_claim in $(oc get objectbucketclaim -n "${registry_name}" -o=NAME) ; do
-  echo $bucket_claim
+for obc_name in $(oc get objectbucketclaim -n "${registry_name}" -o=custom-columns="NAME:.metadata.name" --no-headers) ;
+do
 
-obc_name=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "$bucket_claim")
+  echo $obc_name
 
-echo $obc_name
+  oc delete -n ${registry_name} obc/$obc_name
+  oc delete -n ${registry_name} cm/$obc_name
+  oc delete -n ${registry_name} secret/$obc_name
+  sleep 10
 
-oc delete -n ${registry_name} obc/$obc_name
-oc delete -n ${registry_name} cm/$obc_name
-oc delete -n ${registry_name} secret/$obc_name
-sleep 10
-
-cat <<EOF | oc apply -f -
-apiVersion: objectbucket.io/v1alpha1
-kind: ObjectBucketClaim
-metadata:
-  name: "${obc_name}"
-  namespace: "${registry_name}"
-spec:
-  additionalConfig:
-    bucketclass: registry-bucket-class
-  generateBucketName: "${obc_name}"
-  storageClassName: registry-bucket
-  ssl: false
+  cat <<EOF | oc apply -f -
+  apiVersion: objectbucket.io/v1alpha1
+  kind: ObjectBucketClaim
+  metadata:
+    name: "${obc_name}"
+    namespace: "${registry_name}"
+  spec:
+    additionalConfig:
+      bucketclass: registry-bucket-class
+    generateBucketName: "${obc_name}"
+    storageClassName: registry-bucket
+    ssl: false
 EOF
 
-sleep 10
+  sleep 10
 
-bucket=$(oc get "${bucket_claim}" -n "${registry_name}" -o=jsonpath="{.spec.bucketName}")
-echo "Start restore for ${bucket}"
-bucket_secret=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "${bucket_claim}")
-echo ${bucket_secret}
-echo sleep 10
-acess_key_noobaa=$(oc get secret/"${bucket_secret}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
-access_secret_key_noobaa=$(oc get secret/${bucket_secret} -n "${registry_name}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
-mkdir -p ~/.config/rclone
-get_registry_backup_name=$(oc get regbackup -o=NAME | grep ${backup_name})
-registry_backup_name=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "${get_registry_backup_name}")
-s3_backup_location=$(oc get regbackup/${registry_backup_name}  -o jsonpath=\'{.spec.objectbucket-backup-link}\'| cut -c7- |rev | cut -c3- | rev)
-minio_endpoint=$(oc get regbackup/${registry_backup_name}  -o jsonpath=\'{.spec.minio-endpoint}\')
+  echo sleep 10
+  acess_key_rook=$(oc get secret/"${obc_name}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
+  access_secret_key_rook=$(oc get secret/${obc_name} -n "${registry_name}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
+  rook_s3_endpoint=$(oc get objectbucketclaim/"${obc_name}" -n "${registry_name}" -o=jsonpath='{.spec.objectBucketName}' | xargs oc get objectbucket -n "${registry_name}" -o=jsonpath='{.spec.endpoint.bucketHost}')
 
-echo $s3_backup_location
+  mkdir -p ~/.config/rclone
+  get_registry_backup_name=$(oc get regbackup -o=NAME | grep ${backup_name})
+  registry_backup_name=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "${get_registry_backup_name}")
 
-echo "
-[s3_bucket]
-type = s3
-provider = AWS
-env_auth = false
-access_key_id = ${access_key_aws}
-secret_access_key = ${access_secret_key_aws}
-endpoint = ${minio_endpoint}
-region = eu-central-1
-location_constraint = EU
-acl = bucket-owner-full-control
+  s3_backup_location=$(oc get regbackup/${registry_backup_name}  -o jsonpath=\'{.spec.objectbucket-backup-link}\'| cut -c7- |rev | cut -c3- | rev)
+  minio_endpoint=$(oc get regbackup/${registry_backup_name}  -o jsonpath=\'{.spec.minio-endpoint}\')
 
-[noobaa]
-type = s3
-provider = Ceph
-env_auth = false
-access_key_id = ${acess_key_noobaa}
-secret_access_key = ${access_secret_key_noobaa}
-endpoint = ${noobaa_s3_endpoint}
-acl = bucket-owner-full-control
-bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
+  echo $s3_backup_location
 
-rclone  -v sync s3_bucket:${s3_backup_location} noobaa:${bucket}
+  echo "
+  [minio]
+  type = s3
+  provider = AWS
+  env_auth = false
+  access_key_id = ${access_key_aws}
+  secret_access_key = ${access_secret_key_aws}
+  endpoint = ${minio_endpoint}
+  region = eu-central-1
+  location_constraint = EU
+  acl = bucket-owner-full-control
 
-if [ $? -eq 0 ]; then
- echo "Restore was compete with no errors"
-else
-  echo "Backup complete with ERROR"
-fi ; done
+  [rook]
+  type = s3
+  provider = Ceph
+  env_auth = false
+  access_key_id = ${acess_key_rook}
+  secret_access_key = ${access_secret_key_rook}
+  endpoint = ${rook_s3_endpoint}
+  acl = bucket-owner-full-control
+  bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
+
+  rclone  -v sync s3_bucket:${s3_backup_location} rook:${bucket}
+
+  if [ $? -eq 0 ]; then
+   echo "Restore was compete with no errors"
+  else
+    echo "Backup complete with ERROR"
+  fi ;
+done
 
 echo "fix for rejected routes"
 for i in $(oc get svc -n ${registry_name} -o=NAME| awk -F / {'print $2'});
 do
-route_count=$(oc get routes -n ${registry_name} --field-selector=spec.to.name=$i,spec.path!='' --no-headers | wc -l)
-    if [[ "${route_count}" -ge "2" ]]; then
-oc get routes -n ${registry_name} --field-selector=spec.to.name=$i,spec.path!='' --no-headers |grep -v HostAlreadyClaimed | awk {'print $1'}| xargs -r oc delete route -n ${registry_name};
-    fi ; done
+  route_count=$(oc get routes -n ${registry_name} --field-selector=spec.to.name=$i,spec.path!='' --no-headers | wc -l)
+      if [[ "${route_count}" -ge "2" ]]; then
+  oc get routes -n ${registry_name} --field-selector=spec.to.name=$i,spec.path!='' --no-headers |grep -v HostAlreadyClaimed | awk {'print $1'}| xargs -r oc delete route -n ${registry_name};
+      fi ;
+done

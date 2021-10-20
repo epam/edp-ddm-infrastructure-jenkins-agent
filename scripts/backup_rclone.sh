@@ -25,17 +25,17 @@ minio_endpoint=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.da
 echo "Getting backupBucket for secret"
 destination_bucket=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-location}' | base64 -d)
 
-for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} -o=NAME) ; do
-  bucket=$(oc get "${bucket_claim}" -n "${registry_name}" -o=jsonpath="{.spec.bucketName}")
+for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers -o=custom-columns="NAME:.metadata.name") ; do
+  bucket=$(oc get objectbucketclaim/"${bucket_claim}" -n "${registry_name}" -o=jsonpath="{.spec.bucketName}")
   echo "Start backup for ${bucket}"
-  bucket_secret=$(awk 'BEGIN{split(ARGV[1],var,"/");print var[2]}' "${bucket_claim}")
 
-  acess_key_noobaa=$(oc get secret/"${bucket_secret}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
-  access_secret_key_noobaa=$(oc get secret/"${bucket_secret}" -n "${registry_name}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
+  access_key_rook=$(oc get secret/"${bucket_claim}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
+  access_secret_key_rook=$(oc get secret/"${bucket_claim}" -n "${registry_name}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)
+  rook_s3_endpoint=$(oc get objectbucketclaim/"${bucket_claim}" -n "${registry_name}" -o=jsonpath='{.spec.objectBucketName}' | xargs oc get objectbucket -n "${registry_name}" -o=jsonpath='{.spec.endpoint.bucketHost}')
   mkdir -p ~/.config/rclone
 
   echo "
-  [s3_bucket]
+  [minio]
   type = s3
   provider = AWS
   env_auth = false
@@ -46,17 +46,17 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} -o=NAME) ; do
   location_constraint = EU
   acl = bucket-owner-full-control
 
-  [noobaa]
+  [rook]
   type = s3
   provider = Ceph
   env_auth = false
-  access_key_id = ${acess_key_noobaa}
-  secret_access_key = ${access_secret_key_noobaa}
-  endpoint = ${noobaa_s3_endpoint}
+  access_key_id = ${access_key_rook}
+  secret_access_key = ${access_secret_key_rook}
+  endpoint = ${rook_s3_endpoint}
   acl = bucket-owner-full-control
   bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
 
-  rclone sync noobaa:${bucket} s3_bucket:${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_secret}/
+  rclone sync rook:${bucket} minio:${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_claim}/
 
 
   if [ $? -eq 0 ]; then
@@ -71,10 +71,10 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} -o=NAME) ; do
     registry-alias: ${registry_name}
     velero-backup-name: ${registry_name}-${execution_time}
     minio-endpoint: ${minio_endpoint}
-    objectbucket-backup-link: s3://${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_secret}/
+    objectbucket-backup-link: s3://${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_claim}/
 EOF
 
-  echo "s3://${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_secret}/"
+  echo "s3://${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_claim}/"
   else
     echo "Backup complete with ERROR"
   fi ;
