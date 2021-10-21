@@ -38,7 +38,6 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers 
   echo "
   [minio]
   type = s3
-  provider = AWS
   env_auth = false
   access_key_id = ${access_key_aws}
   secret_access_key = ${access_secret_key_aws}
