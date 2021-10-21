@@ -179,7 +179,7 @@ EOF
   acl = bucket-owner-full-control
   bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
 
-  rclone  -v sync s3_bucket:${s3_backup_location} rook:${bucket}
+  rclone  -v sync minio:${s3_backup_location} rook:${bucket}
 
   if [ $? -eq 0 ]; then
    echo "Restore was compete with no errors"
