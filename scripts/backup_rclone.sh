@@ -9,9 +9,7 @@ registry_name="$1"
 edp_ns="$2"
 backup_type="$3"
 
-noobaa_s3_host=$(oc get route/s3 -n openshift-storage -o jsonpath='{.spec.host}')
-noobaa_s3_endpoint="https://${noobaa_s3_host}"
-
+declare -a openshift_resources=("service" "gerrit" "jenkins" "codebase")
 execution_time=$(date '+%Y-%m-%d-%H-%M-%S')
 backup_date=$(date '+%Y-%m-%d-%H-%M-%S')
 
@@ -26,6 +24,8 @@ echo "Getting Rook endpoint"
 rook_s3_endpoint=$(oc get cephobjectstore/mdtuddm -n openshift-storage -o=jsonpath='{.status.info.endpoint}')
 echo "Getting backupBucket for secret"
 destination_bucket=$(oc get secret/backup-credentials -n ${edp_ns} -o jsonpath='{.data.backup-s3-like-storage-location}' | base64 -d)
+
+velero backup create ${registry_name}-${execution_time} --include-namespaces ${registry_name} --wait
 
 for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers -o=custom-columns="NAME:.metadata.name") ; do
   bucket=$(oc get objectbucketclaim/"${bucket_claim}" -n "${registry_name}" -o=jsonpath="{.spec.bucketName}")
@@ -56,10 +56,31 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers 
   acl = bucket-owner-full-control
   bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
 
-  rclone sync rook:${bucket} minio:${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_claim}/
+  rclone sync rook:${bucket} minio:${destination_bucket}/backups/${registry_name}-${execution_time}/obc-backup/${bucket_claim}/
 
+done
 
-  if [ $? -eq 0 ]; then
+echo "Get Openshift resources and backup them"
+rm -rf /tmp/openshift-resources  && mkdir -p /tmp/openshift-resources
+echo "Get Machineset Resource"
+oc get machinesets -n openshift-machine-api \
+-o custom-columns="NAME:.metadata.name" --no-headers | grep ${registry_name} | xargs oc get machinesets \
+-n openshift-machine-api \
+-o yaml > /tmp/openshift-resources/machine-sets.yaml
+echo "Machineset back upped"
+
+for resources_kind in "${openshift_resources[@]}"
+do
+    for name in $(oc get ${resources_kind} -n ${registry_name} --no-headers -o custom-columns="NAME:.metadata.name" | sed 'N;s/\n/ /g')
+    do
+      echo ${resources_kind}/${name}
+      oc get ${resources_kind}/${name} -n ${registry_name} -o yaml > /tmp/openshift-resources/${resources_kind}-${name}.yaml
+    done
+done
+rclone copy /tmp/openshift-resources minio:/${destination_bucket}/backups/${registry_name}-${execution_time}/openshift-resources
+rm -rf /tmp/openshift-resources
+
+if [ $? -eq 0 ]; then
   cat <<EOF | oc apply -f -
   apiVersion: ddm.registy.jenkins/v1
   kind: RegistryBackup
@@ -71,16 +92,9 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers 
     registry-alias: ${registry_name}
     velero-backup-name: ${registry_name}-${execution_time}
     minio-endpoint: ${minio_endpoint}
-    objectbucket-backup-link: s3://${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_claim}/
+    objectbucket-backup-link: s3://${destination_bucket}/backups/${registry_name}-${execution_time}/obc-backup/
 EOF
-
-  echo "s3://${destination_bucket}/backups/obc-backup/${registry_name}/${execution_time}/${bucket_claim}/"
-  else
-    echo "Backup complete with ERROR"
-  fi ;
-done
-
-velero backup create ${registry_name}-${execution_time} --include-namespaces ${registry_name} --wait
+fi
 
 registry_ddm_resource=$(oc get regbackup/${registry_name}-${execution_time})
 
