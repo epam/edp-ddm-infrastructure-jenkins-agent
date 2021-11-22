@@ -31,7 +31,7 @@ location_constraint = EU
 acl = bucket-owner-full-control"> ~/.config/rclone/rclone.conf
 rm -rf /tmp/openshift-resources && mkdir /tmp/openshift-resources
 rclone copy minio:${minio_bucket_name}/backups/${velero_backup}/openshift-resources /tmp/openshift-resources
-for object in $(ls /tmp/openshift_resources | grep -wv -e "machine-sets.yaml");
+for object in $(ls /tmp/openshift-resources | grep -wv -e "machine-sets.yaml");
 do
   oc apply -f /tmp/openshift-resources/$object
 done
