@@ -2,6 +2,9 @@ apiVersion: v2.edp.epam.com/v1alpha1
 kind: JenkinsAgent
 metadata:
   name: {{ .Values.agentName }}
+  labels:
+    image-name: {{ .Values.image.name }}
+    image-version: {{ .Values.image.version }}
 spec:
   name: {{ .Values.agentName }}
   template: |-
