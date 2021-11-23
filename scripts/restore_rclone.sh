@@ -240,7 +240,7 @@ do
   acl = bucket-owner-full-control
   [rook]
   type = s3
-  provider = Ceph
+  v2_auth = true
   env_auth = false
   access_key_id = ${acess_key_rook}
   secret_access_key = ${access_secret_key_rook}
