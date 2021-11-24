@@ -361,7 +361,6 @@ done
 echo "Start restoring all others resources"
 time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,routes,objectbucketclaimse --wait
 echo "End restoring all others resources"
-TODO Patch keycloakauthflow and keycloakclientsscope with no finalizers
 for obc_name in $(rclone lsf minio:${minio_bucket_name}/backups/${backup_name}/obc-backup | tr -d '/');
 do
   echo $obc_name
