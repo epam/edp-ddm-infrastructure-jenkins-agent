@@ -36,7 +36,7 @@ do
   oc apply -f /tmp/openshift-resources/$object
 done
 echo "Start restoring all resources expect pods section"
-time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,replicasets,deployments,deploymentconfigs,statefulsets,horizontalpodautoscalers,deamonsets --wait
+time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,replicasets,deployments,deploymentconfigs,statefulsets,horizontalpodautoscalers,deamonsets,objectbucketclaims --wait
 sleep 20
 echo "Delete rejecting routes"
 for route in $(oc get routes -n ${registry_name} --no-headers -o custom-columns="NAME:.metadata.name")
@@ -60,7 +60,7 @@ while [[ $(oc get pods -l app='nexus' -o 'jsonpath={..status.conditions[?(@.type
 done
 echo "End restoring nexus"
 echo "Start restoring gerrit"
-time velero create restore --selector app=gerrit --from-backup  "${velero_backup}" --wait
+time velero create restore --selector app=gerrit --from-backup  "${velero_backup}" --exclude-resources services --wait
 timeCount=0
 while [[ $(oc get pods -l app='gerrit' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
    echo "Waiting for Gerrit pod" && sleep 10;
@@ -75,7 +75,7 @@ echo "Start restoring jenkins"
 time velero create restore --selector app=jenkins --from-backup  "${velero_backup}" --wait
 oc adm policy add-role-to-user view system:serviceaccount:jenkins -n ${registry_name}
 oc adm policy add-scc-to-user anyuid system:serviceaccount:jenkins -n ${registry_name}
-oc adm policy add-scc-to-user priveleged system:serviceaccount:jenkins -n ${registry_name}
+oc adm policy add-scc-to-user privileged system:serviceaccount:jenkins -n ${registry_name}
 timeCount=0
 while [[ $(oc get pods -l app='jenkins' -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
     echo "Waiting for Jenkins pod" && sleep 10;
@@ -215,11 +215,153 @@ while [[ $(oc get pods -l app='form-management-provider' -o 'jsonpath={..status.
   done
 done
 echo "End restoring form-management-provider"
+echo "Start restoring Kafka cluster zookeeper"
+time velero restore create --from-backup "${velero_backup}" --selector strimzi.io/name=kafka-cluster-zookeeper --include-resources pods --wait
+sleep 10
+time velero restore create --from-backup "${velero_backup}" --selector strimzi.io/name=kafka-cluster-zookeeper --wait
+sleep 20
+echo "Deleting pods for DNS resolving"
+oc delete pods --selector strimzi.io/name=kafka-cluster-zookeeper -n ${registry_name}
+pod_name=$(oc get pod -l strimzi.io/name=kafka-cluster-zookeeper --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+ while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+   echo "Waiting for ${i} pod" && sleep 10;
+   timeCount=$(( $timeCount + 10 ))
+   if [[ timeCount -eq 60 ]]
+   then
+      oc delete pod $i -n ${registry_name}
+   fi
+ done
+done
+echo "Start restoring Kafka pods"
+time velero restore create --from-backup "${velero_backup}" --selector strimzi.io/name=kafka-cluster-kafka --include-resources pods --wait
+sleep 10
+time velero restore create --from-backup "${velero_backup}" --selector strimzi.io/name=kafka-cluster-kafka --wait
+sleep 20
+oc delete pods --selector strimzi.io/name=kafka-cluster-kafka -n ${registry_name}
+pod_name=$(oc get pod -l strimzi.io/name=kafka-cluster-kafka --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+ while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+   echo "Waiting for ${i} pod" && sleep 10;
+   timeCount=$(( $timeCount + 10 ))
+   if [[ timeCount -eq 60 ]]
+   then
+      oc delete pod $i -n ${registry_name}
+   fi
+ done
+done
 
+echo "Start restoring Redash resources"
+echo "Start restoring Redash  Postgresql Admin pod"
+time  velero create restore --from-backup "${velero_backup}" --selector app=postgresql-admin --include-resources pods --wait
+sleep 10
+sleep "Restoring StatefulSet for redash postgresql admin pod"
+time  velero create restore --from-backup "${velero_backup}" --selector app=postgresql-admin --wait
+pod_name=$(oc get pod -l app=postgresql-admin --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+ while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+   echo "Waiting for ${i} pod" && sleep 10;
+   timeCount=$(( $timeCount + 10 ))
+   if [[ timeCount -eq 60 ]]
+   then
+      oc delete pod $i -n ${registry_name}
+   fi
+ done
+done
+
+echo "Start restoring Redash postgresql viewer pod"
+time  velero create restore --from-backup "${velero_backup}" --selector app=postgresql-viewer --include-resources pods --wait
+sleep "Restoring StatefulSet for redash postgresql viewer pods"
+time  velero create restore --from-backup "${velero_backup}" --selector app=postgresql-viewer --wait
+pod_name=$(oc get pod -l app=postgresql-viewer --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+ while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+   echo "Waiting for ${i} pod" && sleep 10;
+   timeCount=$(( $timeCount + 10 ))
+   if [[ timeCount -eq 60 ]]
+   then
+      oc delete pod $i -n ${registry_name}
+   fi
+ done
+done
+echo "Start restoring Redash redis admin pod"
+time  velero create restore --from-backup "${velero_backup}" --selector app=redis-admin --include-resources pods --wait
+sleep 10
+echo "Start restoring Redash redis viewer pod"
+sleep 10
+time  velero create restore --from-backup "${velero_backup}" --selector app=redis-viewer --include-resources pods --wait
+sleep "Restoring StatefulSet for redash redis admin/viewer pods."
+time  velero create restore --from-backup "${velero_backup}" --selector app=redis --wait
+sleep 10
+pod_name=$(oc get pod -l app=redis-admin --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+ while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+   echo "Waiting for ${i} pod" && sleep 10;
+   timeCount=$(( $timeCount + 10 ))
+   if [[ timeCount -eq 60 ]]
+   then
+      oc delete pod $i -n ${registry_name}
+   fi
+ done
+done
+pod_name=$(oc get pod -l app=redis-viewer --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+ while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+   echo "Waiting for ${i} pod" && sleep 10;
+   timeCount=$(( $timeCount + 10 ))
+   if [[ timeCount -eq 60 ]]
+   then
+      oc delete pod $i -n ${registry_name}
+   fi
+ done
+done
+echo "Start restoring redash admin pods"
+time velero create restore --selector  app.kubernetes.io/instance=redash-admin --from-backup  "${velero_backup}" --wait
+timeCount=0
+pod_name=$(oc get pod -l app.kubernetes.io/instance=redash-admin --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+ timeCount=0;
+   while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+     echo "Waiting for $i pod " && sleep 10;
+     timeCount=$(( $timeCount + 10 ))
+     if [[ timeCount -eq 60  ]]
+     then
+        oc delete pod -l app=redis-admin -n ${registry_name}
+        while [[ $(oc get pods -l app=redis-admin -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+          echo "Waiting for redis admin pod" && sleep 5
+        done
+        oc delete pod $i -n ${registry_name}
+     fi
+   done
+done
+echo "Start restoring redash viewer pods"
+time velero create restore --selector  app.kubernetes.io/instance=redash-viewer --from-backup  "${velero_backup}" --wait
+pod_name=$(oc get pod -l app.kubernetes.io/instance=redash-viewer --no-headers -o custom-columns=":metadata.name" -n "${registry_name}")
+for i in ${pod_name} ;do
+   timeCount=0;
+   while [[ $(oc get pods $i -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+     echo "Waiting for $i pod" && sleep 10;
+     timeCount=$(( $timeCount + 10 ))
+     if [[ timeCount -eq 60  ]]
+     then
+        oc delete pod -l app=redis-viewer -n ${registry_name}
+        while [[ $(oc get pods -l app=redis-viewer -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}' -n ${registry_name}) != "True" ]]; do
+          echo "Waiting for redis viewer pod" && sleep 5
+        done
+        oc delete pod $i -n ${registry_name}
+     fi
+   done
+done
 echo "Start restoring all others resources"
-time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,routes --wait
+time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,routes,objectbucketclaimse --wait
 echo "End restoring all others resources"
-
+TODO Patch keycloakauthflow and keycloakclientsscope with no finalizers
 for obc_name in $(rclone lsf minio:${minio_bucket_name}/backups/${backup_name}/obc-backup | tr -d '/');
 do
   echo $obc_name
@@ -251,4 +393,6 @@ do
   echo "Restoring ObjectBucketClaim ${obc_name}"
   rclone  -v sync minio:${minio_bucket_name}/backups/${backup_name}/obc-backup/${obc_name} rook:${bucket_name}
 done
+echo "Waiting all pods restorting"
+sleep 200
 
