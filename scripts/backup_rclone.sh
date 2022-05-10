@@ -66,7 +66,7 @@ echo "Get Machineset Resource"
 oc get machinesets -n openshift-machine-api \
 -o custom-columns="NAME:.metadata.name" --no-headers | grep ${registry_name} | xargs oc get machinesets \
 -n openshift-machine-api \
--o yaml > /tmp/openshift-resources/machine-sets.yaml
+-o json > /tmp/openshift-resources/machine-sets.json
 echo "Machineset back upped"
 
 for resources_kind in "${openshift_resources[@]}"
