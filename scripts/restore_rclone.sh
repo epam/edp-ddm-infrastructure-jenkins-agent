@@ -30,7 +30,7 @@ region = eu-central-1
 location_constraint = EU
 acl = bucket-owner-full-control"> ~/.config/rclone/rclone.conf
 rm -rf /tmp/openshift-resources && mkdir /tmp/openshift-resources
-rclone copy minio:${minio_bucket_name}/backups/${velero_backup}/openshift-resources /tmp/openshift-resources
+rclone copy minio:${minio_bucket_name}/openshift-backups/backups/${velero_backup}/openshift-resources /tmp/openshift-resources
 for object in $(ls /tmp/openshift-resources | grep -wv -e "machine-sets.json");
 do
   oc apply -f /tmp/openshift-resources/$object
@@ -387,7 +387,7 @@ done
 echo "Start restoring all others resources"
 time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,routes,objectbucketclaimse --wait
 echo "End restoring all others resources"
-for obc_name in $(rclone lsf minio:${minio_bucket_name}/backups/${backup_name}/obc-backup | tr -d '/');
+for obc_name in $(rclone lsf minio:${minio_bucket_name}/openshift-backups/backups/${backup_name}/obc-backup | tr -d '/');
 do
   echo $obc_name
   acess_key_rook=$(oc get secret/"${obc_name}" -n "${registry_name}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)
@@ -416,7 +416,7 @@ do
   bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
 
   echo "Restoring ObjectBucketClaim ${obc_name}"
-  rclone  -v sync minio:${minio_bucket_name}/backups/${backup_name}/obc-backup/${obc_name} rook:${bucket_name}
+  rclone  -v sync minio:${minio_bucket_name}/openshift-backups/backups/${backup_name}/obc-backup/${obc_name} rook:${bucket_name}
 done
 echo "Waiting all pods restorting"
 sleep 200
