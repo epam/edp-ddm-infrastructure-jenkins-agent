@@ -56,18 +56,12 @@ for bucket_claim in $(oc get objectbucketclaim -n ${registry_name} --no-headers 
   acl = bucket-owner-full-control
   bucket_acl = authenticated-read" > ~/.config/rclone/rclone.conf
 
-  rclone sync rook:${bucket} minio:${destination_bucket}/backups/${registry_name}-${execution_time}/obc-backup/${bucket_claim}/
+  rclone sync rook:${bucket} minio:${destination_bucket}/openshift-backups/backups/${registry_name}-${execution_time}/obc-backup/${bucket_claim}/
 
 done
 
 echo "Get Openshift resources and backup them"
 rm -rf /tmp/openshift-resources  && mkdir -p /tmp/openshift-resources
-echo "Get Machineset Resource"
-oc get machinesets -n openshift-machine-api \
--o custom-columns="NAME:.metadata.name" --no-headers | grep ${registry_name} | xargs oc get machinesets \
--n openshift-machine-api \
--o yaml > /tmp/openshift-resources/machine-sets.yaml
-echo "Machineset back upped"
 
 for resources_kind in "${openshift_resources[@]}"
 do
@@ -77,7 +71,7 @@ do
       oc get ${resources_kind}/${name} -n ${registry_name} -o yaml > /tmp/openshift-resources/${resources_kind}-${name}.yaml
     done
 done
-rclone copy /tmp/openshift-resources minio:/${destination_bucket}/backups/${registry_name}-${execution_time}/openshift-resources
+rclone copy /tmp/openshift-resources minio:/${destination_bucket}/openshift-backups/backups/${registry_name}-${execution_time}/openshift-resources
 rm -rf /tmp/openshift-resources
 
 if [ $? -eq 0 ]; then
@@ -92,7 +86,7 @@ if [ $? -eq 0 ]; then
     registry-alias: ${registry_name}
     velero-backup-name: ${registry_name}-${execution_time}
     minio-endpoint: ${minio_endpoint}
-    objectbucket-backup-link: s3://${destination_bucket}/backups/${registry_name}-${execution_time}/obc-backup/
+    objectbucket-backup-link: s3://${destination_bucket}/openshift-backups/backups/${registry_name}-${execution_time}/obc-backup/
 EOF
 fi
 
