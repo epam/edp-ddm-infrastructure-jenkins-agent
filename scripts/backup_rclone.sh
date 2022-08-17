@@ -9,7 +9,7 @@ registry_name="$1"
 edp_ns="$2"
 backup_type="$3"
 
-declare -a openshift_resources=("service" "gerrit" "jenkins" "codebase")
+declare -a openshift_resources=("service" "gerrit" "jenkins" "codebase" "keycloakclient" "jenkinsauthorizationrolemapping")
 execution_time=$(date '+%Y-%m-%d-%H-%M-%S')
 backup_date=$(date '+%Y-%m-%d-%H-%M-%S')
 

@@ -31,7 +31,7 @@ location_constraint = EU
 acl = bucket-owner-full-control"> ~/.config/rclone/rclone.conf
 rm -rf /tmp/openshift-resources && mkdir /tmp/openshift-resources
 rclone copy minio:${minio_bucket_name}/openshift-backups/backups/${velero_backup}/openshift-resources /tmp/openshift-resources
-for object in $(ls /tmp/openshift-resources | grep -wv -e "machine-sets.json");
+for object in $(ls /tmp/openshift-resources | grep -wv -e "jenkinsauthorizationrolemapping");
 do
   oc apply -f /tmp/openshift-resources/$object
 done
@@ -420,4 +420,15 @@ do
 done
 echo "Waiting all pods restorting"
 sleep 200
+
+echo "Restore JenkinsAuthorizationRoleMapping"
+oc delete jenkinsauthorizationrolemapping -n ${registry_name} --all
+
+for jauthrolemap in $(ls /tmp/openshift-resources | grep "jenkinsauthorizationrolemapping");
+do
+  oc apply -f /tmp/openshift-resources/$object
+done
+
+rm -rf /tmp/openshift-resources
+
 
