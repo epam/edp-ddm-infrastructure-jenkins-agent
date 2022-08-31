@@ -41,7 +41,7 @@ do
   oc -n "${registry_name}" annotate service "${service}" kubectl.kubernetes.io/last-applied-configuration-
 done
 echo "Start restoring all resources expect pods section"
-time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,replicasets,deployments,deploymentconfigs,statefulsets,horizontalpodautoscalers,deamonsets,objectbucketclaims --wait
+time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,replicasets,deployments,deploymentconfigs,statefulsets,horizontalpodautoscalers,deamonsets,objectbucketclaims,redisfailovers --wait
 sleep 20
 echo "Delete rejecting routes"
 for route in $(oc get routes -n ${registry_name} --no-headers -o custom-columns="NAME:.metadata.name")
@@ -105,6 +105,26 @@ while [[ $(oc get pods -l app='jenkins' -o 'jsonpath={..status.conditions[?(@.ty
     fi
 done
 echo "End restoring jenkins"
+
+echo "Start restoring redis-sentinel"
+# Restore all except RedisFailover CR to restore data on PVC via restic
+time velero restore create --selector app.kubernetes.io/name=redis-sentinel --from-backup "${velero_backup}" --wait
+sleep 10
+# Restore RedisFailover CR to recreate pods with restored data on PVC
+timeCount=0
+time velero restore create --from-backup "${velero_backup}" --include-resources redisfailovers --wait
+while [[ $(oc get statefulset rfr-redis-sentinel -o 'jsonpath={..status.replicas}' -n ${registry_name}) \
+          != $(oc get statefulset rfr-redis-sentinel -o 'jsonpath={..status.readyReplicas}' -n ${registry_name}) ]]; do
+  echo "Waiting for Redis pods are ready" && sleep 10;
+  timeCount=$(( $timeCount + 10 ))
+  if [[ timeCount -eq 600 ]]
+  then
+    oc delete pod -l app.kubernetes.io/name=redis-sentinel -l app.kubernetes.io/component=redis -n ${registry_name}
+    echo "Restarting Redis pods"
+  fi
+done
+echo "End restoring redis-sentinel"
+
 echo "Start restoring citus-master"
 time velero restore create --selector app=citus-master --from-backup "${velero_backup}" --wait
 timeCount=0
