@@ -12,7 +12,7 @@ RUN curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://do
 RUN yum remove git -y && yum remove perl-Git -y
 RUN yum install -y https://repo.ius.io/ius-release-el7.rpm \
                    https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-RUN yum install -y wget python3 skopeo jq openssl git224
+RUN yum install -y wget python3 skopeo jq openssl git
 RUN yum clean all  \
     && rm -rf /var/cache/yum
 RUN ln -s --force /usr/local/bin/helm /sbin/
