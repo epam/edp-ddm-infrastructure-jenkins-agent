@@ -14,10 +14,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 USER root
 
-# add velero scripts for backup and restore
-RUN mkdir /home/jenkins/backup && mkdir /home/jenkins/restore
-COPY ./scripts/restore_rclone.sh /home/jenkins/restore
-COPY ./scripts/backup_rclone.sh /home/jenkins/backup
 
 COPY pip3_test_requirements.txt /root/
 RUN curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_7/devel:kubic:libcontainers:stable.repo
