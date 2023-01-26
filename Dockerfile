@@ -1,5 +1,6 @@
 FROM epamedp/edp-jenkins-maven-java11-agent:2.0.0
-ENV GIT_VERSION=1.8.3.1-23.el7_8 \
+ENV TZ=Europe/Kiev \
+    GIT_VERSION=1.8.3.1-23.el7_8 \
     JAVA_HOME=/usr/lib/jvm/java-11-openjdk \
     JQ_VERSION=1.6-2.el7 \
     OPENSHIFT_BUILD_NAME=edp-jenkins-maven-java11-agent-dockerfile-release-2-0-2 \
