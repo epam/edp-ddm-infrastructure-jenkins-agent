@@ -1,6 +1,6 @@
 FROM epamedp/edp-jenkins-maven-java11-agent:2.0.0
 ENV TZ=Europe/Kiev \
-    GIT_VERSION=1.8.3.1-23.el7_8 \
+    GIT_VERSION=2.39.2-1.ep7.1 \
     JAVA_HOME=/usr/lib/jvm/java-11-openjdk \
     JQ_VERSION=1.6-2.el7 \
     OPENSHIFT_BUILD_NAME=edp-jenkins-maven-java11-agent-dockerfile-release-2-0-2 \
@@ -24,7 +24,8 @@ COPY pip3_test_requirements.txt /root/
 RUN curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_7/devel:kubic:libcontainers:stable.repo
 RUN yum remove git -y && yum remove perl-Git -y
 RUN yum install -y https://repo.ius.io/ius-release-el7.rpm \
-                   https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+                   https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm \
+                   https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm
 
 RUN yum install -y python3-${PYTHON3_VERSION} \
                    skopeo-${SKOPEO_VERSION} \
