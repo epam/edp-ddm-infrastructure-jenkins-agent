@@ -9,7 +9,8 @@ ENV TZ=Europe/Kiev \
     PYTHON3_VERSION=3.6.8-18.el7 \
     PYTHONUNBUFFERED=1 \
     SKOPEO_VERSION=1.4.1-1.el7.3.1 \
-    VELERO_VERSION=1.9.2
+    VELERO_VERSION=1.9.2 \
+    OC_BINARY_VERSION=4.12.0-0.okd-2023-04-16-041331
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -57,3 +58,9 @@ ADD https://github.com/vmware-tanzu/velero/releases/download/v${VELERO_VERSION}/
 RUN tar -xvf velero-v${VELERO_VERSION}-linux-amd64.tar.gz \
     && rm velero-v${VELERO_VERSION}-linux-amd64.tar.gz \
     && mv velero-v${VELERO_VERSION}-linux-amd64/velero /usr/local/bin/
+
+ADD https://github.com/okd-project/okd/releases/download/${OC_BINARY_VERSION}/openshift-client-linux-${OC_BINARY_VERSION}.tar.gz openshift-client-linux-${OC_BINARY_VERSION}.tar.gz
+RUN tar -xf openshift-client-linux-${OC_BINARY_VERSION}.tar.gz \
+    && rm openshift-client-linux-${OC_BINARY_VERSION}.tar.gz \
+    && mv oc /usr/bin/oc \
+    && mv kubectl /usr/bin/kubectl
