@@ -41,7 +41,7 @@ do
   oc -n "${registry_name}" annotate service "${service}" kubectl.kubernetes.io/last-applied-configuration-
 done
 echo "Start restoring all resources expect pods section"
-time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,replicasets,deployments,deploymentconfigs,statefulsets,horizontalpodautoscalers,deamonsets,objectbucketclaims,redisfailovers --wait
+time velero restore create --from-backup "${velero_backup}" --exclude-resources pods,replicasets,deployments,deploymentconfigs,statefulsets,horizontalpodautoscalers,deamonsets,objectbucketclaims,redisfailovers,kafkas,kafkaconnects --wait
 sleep 20
 echo "Delete rejecting routes"
 for route in $(oc get routes -n ${registry_name} --no-headers -o custom-columns="NAME:.metadata.name")
@@ -452,3 +452,9 @@ done
 rm -rf /tmp/openshift-resources
 
 
+docker run -it --rm \
+    -e OC_CLI_LOGIN_COMMAND="oc login --token=sha256~dz8Kw--gsaxdwLW2KPegZV_KSEZnzehx8YtahQePzJc --server=https://api.1-9-3-7.mdtu-ddm.projects.epam.com:6443" \
+    -e DEST_NEXUS_PASSWORD="FsJdbgzpWKrXgc3G" \
+    -e SRC="nexus-docker-registry.apps.cicd2.mdtu-ddm.projects.epam.com/mdtu-ddm-edp-cicd/infrastructure-jenkins-agent-mdtuddm-23111:1.5.0-MDTUDDM-23111-SNAPSHOT.1" \
+    -e DEST="control-plane/infrastructure-jenkins-agent-mdtuddm-23111:1.5.0-MDTUDDM-23111-SNAPSHOT.1" \
+    nexus-docker-hosted.apps.cicd2.mdtu-ddm.projects.epam.com/kovtun/cicd2totarget:latest
