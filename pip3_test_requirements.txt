@@ -1,4 +1,6 @@
 pytest==6.2.1
 boto3==1.16.38
 allure-pytest==2.8.29
+kubernetes==26.1.0
+PyYAML==6.0
 

@@ -19,8 +19,8 @@ USER root
 RUN mkdir /home/jenkins/backup && mkdir /home/jenkins/restore
 COPY ./scripts/restore_rclone.sh /home/jenkins/restore
 COPY ./scripts/backup_rclone.sh /home/jenkins/backup
-
 COPY pip3_test_requirements.txt /root/
+
 RUN curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/CentOS_7/devel:kubic:libcontainers:stable.repo
 RUN yum remove git -y && yum remove perl-Git -y
 RUN yum install -y https://repo.ius.io/ius-release-el7.rpm \
@@ -46,7 +46,7 @@ RUN chmod 700 get_helm.sh \
     && chmod +x /usr/local/bin/helmfile
 
 # required for tests, but need to check if it is really needed
-RUN pip3 install -r /root/pip3_test_requirements.txt
+RUN pip3 install --no-cache-dir -r /root/pip3_test_requirements.txt
 
 # install rclone
 ADD https://rclone.org/install.sh install.sh
